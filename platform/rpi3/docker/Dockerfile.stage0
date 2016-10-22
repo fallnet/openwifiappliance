@@ -1,0 +1,10 @@
+FROM wifi:raspbian-stage-1
+# make script support download only so it can retry if configuration failed
+COPY common.sh /pi-gen/scripts/common
+# prefetch; chroot will fail but we'll have the packages
+# RUN ( cd /pi-gen; RUN_STAGE=0 IMG_DATE="now" IMG_NAME=raspbian.img ./build.sh; cd / ) || true
+VOLUME ["/work"]
+# docker run with --privileged /stage0.sh will dump the stage0 output into work-vol/
+COPY stage0.sh /
+COPY stage0_01-configure-apt_files_raspi.list /pi-gen/stage0/01-configure-apt/files/raspi.list
+ENTRYPOINT ["/bin/sh", "-c"]

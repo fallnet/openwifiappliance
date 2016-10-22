@@ -1,0 +1,5 @@
+FROM wifi:raspbian-stage-1
+VOLUME ["/work"]
+COPY common.sh /pi-gen/scripts/common
+ADD stage1.sh /
+ENTRYPOINT ["/bin/sh", "-c"]

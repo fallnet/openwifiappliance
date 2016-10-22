@@ -1,0 +1,12 @@
+FROM wifi:raspbian-stage-1
+VOLUME ["/work"]
+# make script support download only so it can retry if configuration failed
+COPY common.sh /pi-gen/scripts/common
+# docker run with --privileged /stage0.sh will dump the stage0 output into work-vol/
+COPY stage2.sh /
+COPY export-image-prerun.sh  /pi-gen/export-image/prerun.sh
+COPY export-image_03-finalise_01-run.sh /pi-gen/export-image/03-finalise/01-run.sh
+COPY stage2_01-sys-tweaks_00-packages /pi-gen/stage2/01-sys-tweaks/00-packages
+COPY stage2_01-sys-tweaks_01-run.sh /pi-gen/stage2/01-sys-tweaks/01-run.sh
+
+ENTRYPOINT ["/bin/sh", "-c"]

@@ -1,0 +1,3 @@
+#!/bin/bash
+export IMG_DATE=now
+export IMG_NAME=raspbian.img 

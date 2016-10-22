@@ -1,0 +1,80 @@
+#!/bin/bash
+
+set -eo pipefail
+
+
+GPSDEV="/dev/ttyACM0"
+SDCARD="/mnt/datacard"
+IFACES=`iwconfig | grep wlx | awk ' { print $1 } '`
+d=`/opt/owa/gpstime "$GPSDEV"`
+# doesn't have rtc; use gps date
+date --set="$d"
+
+# ensure mounted to different file system than root
+(df ${SDCARD} | grep "${SDCARD}") || exit 1
+
+# create logpath
+while [ 1 ]; do
+	#LOGNAME=`grep -m1 LL "$GPSDEV" | sha1sum | cut -f1 -d ' '`
+	BOOTTIME=`date "+%Y-%m-%d_%H:%M:%S"`
+	LOGPATH="${SDCARD}/owa/${BOOTTIME}"
+	if [ ! -d "$LOGPATH" ]; then
+		mkdir -p "$LOGPATH"
+		break
+	fi
+done
+
+# US reg domain doesn't have chan 12 or 13, but I see everyone broadcasting on it;
+# may not have been updated to new FCC regs
+iw reg set GB
+
+# setup all listening interfaces
+for a in $IFACES; do
+	ifconfig $a down
+	iwconfig $a mode monitor
+	ifconfig $a up
+	mkdir -p "$LOGPATH"/"$a"
+	iwconfig $a >"$LOGPATH"/"$a"/iwconfig
+	ifconfig $a >"$LOGPATH"/"$a"/ifconfig
+	iwlist $a chan >"$LOGPATH"/"$a"/iwlistchan
+	# bootup can peak power, wait for device to settle down
+	sleep 0.5s
+done
+
+function chan_switch {
+	dev="$1"
+	chans=`iwlist $dev chan | grep Channel | grep -v "Frequency" | awk ' { print $2 } '`
+	while [ 1 ]; do
+		for c in $chans; do
+			iwconfig $dev chan $c
+			sleep 1s
+		done
+	done
+}
+
+pids=""
+function on_term {
+	kill -TERM $pids
+	exit 0
+}
+trap on_term SIGTERM
+
+mkdir -p "${LOGPATH}"/gps/
+cat $GPSDEV  >${LOGPATH}/gps/nmea.log &
+pids="$pids $!"
+
+for a in $IFACES; do
+	tcpdump -i $a -w ${LOGPATH}/$a/pcap -C 4 -z gzip &
+	pids="$pids $!"
+done
+
+for a in $IFACES; do
+	sleep 2s
+	chan_switch $a &
+	# stagger channels
+	pids="$pids $!"
+done
+
+wait $pids
+# if anything terminates, something went wrong
+exit 1

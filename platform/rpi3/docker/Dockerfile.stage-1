@@ -1,0 +1,10 @@
+FROM debian:stretch
+RUN apt-get update
+RUN yes | apt-get install git qemu-user-static kpartx zerofree quilt pxz zip debootstrap dosfstools
+RUN git clone https://github.com/RPi-Distro/pi-gen
+COPY config /
+COPY stage-1.sh /
+COPY stage0_01-configure-apt_files_raspi.list /pi-gen/stage0/01-configure-apt/files/raspi.list
+COPY stage0_01-configure-apt_files_sources.list /pi-gen/stage0/01-configure-apt/files/sources.list
+COPY stage0-prerun.sh /pi-gen/stage0/prerun.sh
+ENTRYPOINT ["/bin/sh", "-c"]
