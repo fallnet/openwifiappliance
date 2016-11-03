@@ -7,6 +7,8 @@ if [ -z "$DEV" ]; then exit 1; fi
 
 # this file is dumb but whatever
 rm -f gps.time
+oldv=""
+while [ 1 ]; do
 while [ 1 ]; do
 	grep -m1 "GPRMC" "${DEV}" >gps.time &
 	gpspid=$!
@@ -21,6 +23,8 @@ while [ 1 ]; do
 	if [ -z "$oldv" ]; then
 		oldv=`cat gps.time`
 	fi
+done
+if [ ! -z "$oldv" ]; then break; fi
 done
 rm -f gps.time
 
