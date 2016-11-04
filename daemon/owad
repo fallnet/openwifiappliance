@@ -73,7 +73,11 @@ for a in $IFACES; do
 	chan_switch $a &
 	# stagger channels
 	pids="$pids $!"
+	paths="$paths ${LOGPATH}/$a/"
 done
+
+/opt/owa/audio $paths &
+pids="$pids $!"
 
 wait $pids
 # if anything terminates, something went wrong
