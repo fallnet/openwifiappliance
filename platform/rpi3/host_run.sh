@@ -44,7 +44,6 @@ if [ ! -e stage2.tar ]; then
 fi
 
 # copy over
-# * mbrola
 # * amixer volume stuff
 
 # firmware for internal chipset

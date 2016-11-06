@@ -3,8 +3,16 @@
 BASEDIRS="$@"
 amixer cset numid=3 1
 
+# echo SayText's for festival to read
+function gen_commands {
+lastupdate=0
 declare -A seen
 while [ 1 ]; do
+
+# count all the new macs
+c="0"
+while [ 1 ]; do
+lastc="$c"
 for BASEDIR in $BASEDIRS; do
 	pcap=`find  "$BASEDIR" | grep pcap | grep -v gz | tail -n1`
 	if [ -z "$pcap" ]; then
@@ -13,11 +21,39 @@ for BASEDIR in $BASEDIRS; do
 	macs=`/usr/sbin/tcpdump -n -e -r $pcap | sed 's/[RS]A:/\nSA /' | grep 'SA '  | cut -f2 -d' ' | sort | uniq`
 	for a in $macs; do
 		if [ -z "${seen[$a]}" ]; then
-			echo $a
-			aplay /opt/owa/beep.wav >/dev/null 2>&1
+			echo $a >&2
+			c=$((c + 1))
 		fi
 		seen[$a]="t"
 	done
 done
-sleep 2s
+# wait for quiescence
+if [ "$lastc" -eq "$c" ]; then
+	break;
+fi
+done
+
+# tell 'em about it
+size=`du -hsc $BASEDIRS | tail -n1 | awk ' { print $1 } ' | sed 's/M/ megabytes/g'`
+if [ "$c" -ne "0" ]; then
+	echo "(SayText \"$c new devices; ${#seen[@]} total devices. Using $size.\")"
+	lastupdate=`date "+%s"`
+else
+	sleep 5s
+fi
+
+# give the date if nothing
+now=`date "+%s"`
+deadline=$((lastupdate + 30))
+if [ "$now" -gt "$deadline" ]; then
+	lastupdate="$now"
+	d=`TZ=PST8PDT date "+%I:%M"`
+	echo "(SayText \"The time is $d. Using $size. \")"
+fi
+
+done
+}
+
+gen_commands | while read a; do
+	echo $a | festival
 done
