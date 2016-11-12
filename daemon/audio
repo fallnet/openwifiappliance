@@ -7,12 +7,23 @@ amixer cset numid=3 1
 function gen_commands {
 lastupdate=0
 declare -A seen
+declare -A ifaces
+declare -A names
+
+namecount=`wc -l /opt/owa/propernames | cut -f1 -d' '`
+for BASEDIR in $BASEDIRS; do
+	h=`basename $BASEDIR | md5sum | cut -f1 -d' ' | head -c3`
+	h=`printf "%d" 0x$h`
+	idx=`expr $h % $namecount`
+	names[$BASEDIR]=`sed "$idx"'q;d' /opt/owa/propernames`
+done
+
 while [ 1 ]; do
 
 # count all the new macs
 c="0"
-while [ 1 ]; do
-lastc="$c"
+#while [ 1 ]; do
+#lastc="$c"
 for BASEDIR in $BASEDIRS; do
 	pcap=`find  "$BASEDIR" | grep pcap | grep -v gz | tail -n1`
 	if [ -z "$pcap" ]; then
@@ -23,22 +34,27 @@ for BASEDIR in $BASEDIRS; do
 		if [ -z "${seen[$a]}" ]; then
 			echo $a >&2
 			c=$((c + 1))
+			ifaces[$BASEDIR]=$((ifaces[$BASEDIR] + 1))
+			# echo "${ifaces[$BASEDIR]} count $BASEDIR" >&2
 		fi
 		seen[$a]="t"
 	done
 done
 # wait for quiescence
-if [ "$lastc" -eq "$c" ]; then
-	break;
-fi
-done
+#if [ "$lastc" -eq "$c" ]; then
+#	break;
+#fi
+#done
 
 # tell 'em about it
+ifacesize=""
+for BASEDIR in $BASEDIRS; do
+	ifacesize="$ifacesize ${names[$BASEDIR]} has ${ifaces[$BASEDIR]}. "
+done
 size=`du -hsc $BASEDIRS | tail -n1 | awk ' { print $1 } ' | sed 's/M/ megabytes/g'`
 if [ "$c" -ne "0" ]; then
-	echo "(SayText \"$c new devices; ${#seen[@]} total devices. Using $size.\")"
+	echo "(SayText \"$c new devices. ${ifacesize} Total ${#seen[@]}. Using $size.\")" | festival
 	lastupdate=`date "+%s"`
-else
 	sleep 5s
 fi
 
@@ -48,12 +64,10 @@ deadline=$((lastupdate + 30))
 if [ "$now" -gt "$deadline" ]; then
 	lastupdate="$now"
 	d=`TZ=PST8PDT date "+%I:%M"`
-	echo "(SayText \"The time is $d. Using $size. \")"
+	echo "(SayText \"The time is $d. Using $size. \")" | festival
 fi
 
 done
 }
 
-gen_commands | while read a; do
-	echo $a | festival
-done
+gen_commands
