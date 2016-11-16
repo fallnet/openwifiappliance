@@ -13,12 +13,74 @@ import (
 )
 
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Println("usage: parser <scandir>")
+	if len(os.Args) != 3 {
+		fmt.Println("usage: parser <cmd> <scandir>")
+		os.Exit(1)
+	}
+	switch os.Args[1] {
+	case "mac-gps":
+		macGPS(os.Args[2])
+	case "mac-mac":
+		macMac(os.Args[2])
+	default:
+		fmt.Println("unexpected cmd")
+		os.Exit(2)
+	}
+}
+
+func macMac(d string) {
+	ifs := ifaces(d)
+	if len(ifs) == 0 {
+		fmt.Printf("no ifaces found in %q\n", d)
 		os.Exit(1)
 	}
 
-	d := os.Args[1]
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	wg.Add(len(ifs))
+	mg := make(macGraph)
+	for _, c := range ifs {
+		go func(pktc <-chan packet) {
+			defer wg.Done()
+			for pkt := range pktc {
+				mu.Lock()
+				mg.add(pkt)
+				mu.Unlock()
+			}
+		}(c)
+	}
+	wg.Wait()
+
+	gm := make(macSubgraph)
+	i := 1
+	for src, m := range mg {
+		if _, ok := gm[src]; ok {
+			// already visited via subgraph
+			continue
+		}
+		subgraph := make(map[string]struct{})
+		for dst := range m {
+			if _, ok := mg[dst]; ok {
+				mg.subgraph(src, subgraph)
+				mg.subgraph(dst, subgraph)
+				mg.subgraph(src, gm)
+				mg.subgraph(dst, gm)
+				break
+			}
+		}
+		// ignore pairs
+		if len(subgraph) < 3 {
+			continue
+		}
+		s := fmt.Sprintf("subgraph-%04d.dot", i)
+		i++
+		ioutil.WriteFile(s, []byte(mg.Dot(subgraph)), 0600)
+		fmt.Println(mg.Dot(subgraph))
+	}
+}
+
+// macGPS maps macs in a scandir to unique gps coordinates.
+func macGPS(d string) {
 	ifs := ifaces(d)
 	if len(ifs) == 0 {
 		fmt.Printf("no ifaces found in %q\n", d)

@@ -13,6 +13,7 @@ import (
 type packet struct {
 	t       time.Time
 	srcAddr string
+	dstAddr string
 }
 
 func NewMonChan(pcapFile string) (<-chan packet, error) {
@@ -58,20 +59,26 @@ func NewMonChan(pcapFile string) (<-chan packet, error) {
 	return pktc, nil
 }
 
+func line2field(s string, fields []string) string {
+	for _, f := range fields {
+		if strings.Contains(s, f) {
+			return strings.SplitN(strings.SplitN(s, f, 2)[1], " ", 2)[0]
+		}
+	}
+	return ""
+}
+
 func line2pkt(s string) *packet {
-	splt := "SA:"
-	switch {
-	case strings.Contains(s, "SA:"):
-	case strings.Contains(s, "RA:"):
-		splt = "RA:"
-	default:
+	da := line2field(s, []string{"DA:", "TA:"})
+	sa := line2field(s, []string{"SA:", "RA:"})
+	if sa == "" {
 		return nil
 	}
-	sa := strings.SplitN(strings.SplitN(s, splt, 2)[1], " ", 2)[0]
 	t := strings.SplitN(s, " ", 2)[0]
 	f, _ := strconv.ParseFloat(t, 64)
 	return &packet{
 		t:       time.Unix(int64(f), int64((f-float64(int64(f)))*1e9)),
 		srcAddr: sa,
+		dstAddr: da,
 	}
 }
