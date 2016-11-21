@@ -2,72 +2,99 @@
 
 BASEDIRS="$@"
 amixer cset numid=3 1
+amixer sset PCM 100
 
-# echo SayText's for festival to read
-function gen_commands {
-lastupdate=0
+function mac2name {
+	h=`echo -n $1 | md5sum | cut -f1 -d' ' | head -c4`
+	h=`printf "%d" 0x$h`
+	idx=`expr $h % $namecount`
+	sed "$idx"'q;d' /opt/owa/propernames
+}
+
+function read_pcap {
+	for BASEDIR in $BASEDIRS; do
+		pcap=`find  "$BASEDIR" | grep pcap | grep -v gz | tail -n1`
+		if [ -z "$pcap" ]; then
+			continue
+		fi
+
+		# change in size?
+		sz=`du -c $pcap  | awk '{ print $1 }' | tail -n1`
+		if [ "$sz" -eq "${readbytes[$BASEDIR]}" ]; then
+			stuck[$BASEDIR]=$((stuck[$BASEDIR] + 1))
+			continue
+		else
+			readbytes[$BASEDIR]="$sz"
+			stuck[$BASEDIR]=0
+		fi
+
+		macs=`/usr/sbin/tcpdump -n -e -r $pcap | sed 's/[RS]A:/\nSA /' | grep 'SA '  | cut -f2 -d' ' | sort | uniq`
+		for a in $macs; do
+			if [ -z "${seen[$a]}" ]; then
+				# echo $a >&2
+				c=$((c + 1))
+				ifaces[$BASEDIR]=$((ifaces[$BASEDIR] + 1))
+				# echo "${ifaces[$BASEDIR]} count $BASEDIR" >&2
+			fi
+			seen[$a]="t"
+		done
+	done
+}
+
+function notify_festival {
+	# how many devices found per device
+	ifacesize=""
+	for BASEDIR in $BASEDIRS; do
+		echo name ${names[$BASEDIR]}
+		ifacesize="$ifacesize ${names[$BASEDIR]} got ${ifaces[$BASEDIR]}. "
+		if [[ "${stuck[$BASEDIR]}" -gt 5 ]]; then
+			ifacesize="$ifacesize ${names[$BASEDIR]}'s stuck! "
+		fi
+	done
+
+	# say how many found
+	size=`du -hsc $BASEDIRS | tail -n1 | awk ' { print $1 } ' | sed 's/M/ megabytes/g'`
+	echo say something $size $c $lastupdate
+	if [ "$c" -ne "0" ]; then
+		echo "(SayText \"$c new devices. ${ifacesize} Total ${#seen[@]}. Using $size.\")" | festival
+		lastupdate=`date "+%s"`
+		return
+	fi
+
+	# say the date if nothing
+	now=`date "+%s"`
+	deadline=$((lastupdate + 30))
+	if [[ "$now" > "$deadline" ]]; then
+		lastupdate="$now"
+		d=`TZ=PST8PDT date "+%I:%M"`
+		echo "(SayText \"The time is $d. Using $size. \")" | festival
+	fi
+}
+
+
+# total unique seen
 declare -A seen
+# how many seen by an iface
 declare -A ifaces
+# baseidx => human name
 declare -A names
+# baseidx => number of bytes in last pcap file
+declare -A readbytes
+# baseidx => no change in readbytes count
+declare -A stuck
 
 namecount=`wc -l /opt/owa/propernames | cut -f1 -d' '`
 for BASEDIR in $BASEDIRS; do
-	h=`basename $BASEDIR | md5sum | cut -f1 -d' ' | head -c3`
-	h=`printf "%d" 0x$h`
-	idx=`expr $h % $namecount`
-	names[$BASEDIR]=`sed "$idx"'q;d' /opt/owa/propernames`
+	m=`basename $BASEDIR`
+	names[$BASEDIR]=`mac2name $m`
+	readbytes[$BASEDIR]=0
+	stuck[$BASEDIR]=0
 done
 
+lastupdate=0
 while [ 1 ]; do
-
-# count all the new macs
-c="0"
-#while [ 1 ]; do
-#lastc="$c"
-for BASEDIR in $BASEDIRS; do
-	pcap=`find  "$BASEDIR" | grep pcap | grep -v gz | tail -n1`
-	if [ -z "$pcap" ]; then
-		continue
-	fi
-	macs=`/usr/sbin/tcpdump -n -e -r $pcap | sed 's/[RS]A:/\nSA /' | grep 'SA '  | cut -f2 -d' ' | sort | uniq`
-	for a in $macs; do
-		if [ -z "${seen[$a]}" ]; then
-			echo $a >&2
-			c=$((c + 1))
-			ifaces[$BASEDIR]=$((ifaces[$BASEDIR] + 1))
-			# echo "${ifaces[$BASEDIR]} count $BASEDIR" >&2
-		fi
-		seen[$a]="t"
-	done
+	c="0"
+	read_pcap
+	notify_festival
+	sleep 2s
 done
-# wait for quiescence
-#if [ "$lastc" -eq "$c" ]; then
-#	break;
-#fi
-#done
-
-# tell 'em about it
-ifacesize=""
-for BASEDIR in $BASEDIRS; do
-	ifacesize="$ifacesize ${names[$BASEDIR]} has ${ifaces[$BASEDIR]}. "
-done
-size=`du -hsc $BASEDIRS | tail -n1 | awk ' { print $1 } ' | sed 's/M/ megabytes/g'`
-if [ "$c" -ne "0" ]; then
-	echo "(SayText \"$c new devices. ${ifacesize} Total ${#seen[@]}. Using $size.\")" | festival
-	lastupdate=`date "+%s"`
-	sleep 5s
-fi
-
-# give the date if nothing
-now=`date "+%s"`
-deadline=$((lastupdate + 30))
-if [ "$now" -gt "$deadline" ]; then
-	lastupdate="$now"
-	d=`TZ=PST8PDT date "+%I:%M"`
-	echo "(SayText \"The time is $d. Using $size. \")" | festival
-fi
-
-done
-}
-
-gen_commands
