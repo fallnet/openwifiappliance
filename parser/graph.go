@@ -40,6 +40,22 @@ func (mg macGraph) add(pkt packet) {
 	if pkt.dstAddr == "ff:ff:ff:ff:ff:ff" {
 		return
 	}
+	if pkt.dstAddr[:8] == "01:00:5e" {
+		// multicast addresses under the IANA OUI start with 01-00-5E
+		return
+	}
+	if pkt.dstAddr[:5] == "33:33" {
+		// range 33-33-00-00-00-00 to 33-33-FF-FF-FF-FF used for IPv6 multicast
+		return
+	}
+	if pkt.dstAddr == "01:80:c2:00:00:00" {
+		// LLDP multicast
+		return
+	}
+	if pkt.dstAddr == "01:0b:85:00:00:00" {
+		// RRM multicast
+		return
+	}
 	m := mg[pkt.srcAddr]
 	if m == nil {
 		m = make(map[string]struct{})
