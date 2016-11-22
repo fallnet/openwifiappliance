@@ -1,0 +1,9 @@
+root
+root
+mkdir /mnt/shared
+mount -t 9p -o trans=virtio,version=9p2000.L usbvm_shared /mnt/shared
+git clone https://github.com/chzchzchz/diod.git
+cd diod && git checkout stream-read &&  ./autogen.sh && CFLAGS="-O2" ./configure && make -j9
+cp diod/diod /mnt/shared
+poweroff
+

@@ -1,0 +1,6 @@
+root
+root
+ffserver &
+ffmpeg -f video4linux2 -i /dev/video0 http://localhost:8090/cam1.ffm
+poweroff
+

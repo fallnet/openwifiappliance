@@ -1,0 +1,10 @@
+root
+root
+apk add wireless-tools
+apk add iw
+apk add pciutils
+apk add usbutils
+apk add tcpdump
+apk add ffmpeg #110MiB! needed for webcam though
+poweroff
+

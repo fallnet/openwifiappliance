@@ -1,0 +1,13 @@
+root
+root
+mkdir /mnt/shared
+mount -t 9p -o trans=virtio,version=9p2000.L usbvm_shared /mnt/shared
+cp -r /mnt/shared/lib/modules/*  /lib/modules/
+cp /mnt/shared/bzImage /boot/vmlinuz-usbvm
+cp -r /mnt/shared/firmware/* /lib/firmware/
+cp /mnt/shared/diod /usr/bin/diod
+cp /mnt/shared/ffserver.conf /etc
+update-extlinux -v
+cp /mnt/shared/extlinux.conf /boot/
+poweroff
+

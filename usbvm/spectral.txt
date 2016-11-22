@@ -1,0 +1,10 @@
+root
+root
+lsusb
+mkdir -p /mnt/dev/ath9k
+iwconfig wlan0 mode monitor
+ifconfig wlan0 up
+mount -o bind /sys/kernel/debug/ieee80211/phy0/ath9k_htc /mnt/dev/ath9k
+diod  -n -f -e /mnt/dev -e /mnt/dev/ath9k/
+poweroff
+

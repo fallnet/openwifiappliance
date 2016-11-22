@@ -1,0 +1,5 @@
+root
+root
+apk add git gcc make automake autoconf libc-dev ncurses-dev ncurses ncurses-libs
+poweroff
+

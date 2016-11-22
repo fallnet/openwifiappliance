@@ -1,0 +1,11 @@
+#!/bin/bash
+
+function applyscript {
+	sleep 15s
+	cat "$1" | while read a; do
+		echo $a
+		sleep 1s
+	done
+}
+
+applyscript $1
