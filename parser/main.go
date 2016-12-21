@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	if len(os.Args) != 3 {
+	if len(os.Args) < 3 {
 		fmt.Println("usage: parser <cmd> <scandir>")
 		os.Exit(1)
 	}
@@ -21,35 +21,42 @@ func main() {
 	case "mac-gps":
 		macGPS(os.Args[2])
 	case "mac-mac":
-		macMac(os.Args[2])
+		macMac(os.Args[2:])
 	default:
 		fmt.Println("unexpected cmd")
 		os.Exit(2)
 	}
 }
 
-func macMac(d string) {
-	ifs := ifaces(d)
-	if len(ifs) == 0 {
-		fmt.Printf("no ifaces found in %q\n", d)
-		os.Exit(1)
-	}
-
-	var wg sync.WaitGroup
+func macMac(ds []string) {
 	var mu sync.Mutex
-	wg.Add(len(ifs))
+	var wgds sync.WaitGroup
 	mg := make(macGraph)
-	for _, c := range ifs {
-		go func(pktc <-chan packet) {
-			defer wg.Done()
-			for pkt := range pktc {
-				mu.Lock()
-				mg.add(pkt)
-				mu.Unlock()
+	wgds.Add(len(ds))
+	for _, d := range ds {
+		ifs := ifaces(d)
+		if len(ifs) == 0 {
+			fmt.Printf("no ifaces found in %q\n", d)
+			os.Exit(1)
+		}
+		go func() {
+			var wg sync.WaitGroup
+			wg.Add(len(ifs))
+			for _, c := range ifs {
+				go func(pktc <-chan packet) {
+					defer wg.Done()
+					for pkt := range pktc {
+						mu.Lock()
+						mg.add(pkt)
+						mu.Unlock()
+					}
+				}(c)
 			}
-		}(c)
+			wg.Wait()
+			wgds.Done()
+		}()
 	}
-	wg.Wait()
+	wgds.Wait()
 
 	gm := make(macSubgraph)
 	i := 1
