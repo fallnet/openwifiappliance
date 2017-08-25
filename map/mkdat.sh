@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# expects input from parser mac-gps
+
 echo "var mapFeatures = ["
 while read a; do
 mac=`echo $a | awk ' { print $3 } '`
